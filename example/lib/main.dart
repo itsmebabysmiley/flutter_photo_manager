@@ -5,7 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:oktoast/oktoast.dart';
 import 'package:photo_manager/photo_manager.dart';
+import 'package:photo_manager_example/myscreen.dart';
 import 'package:provider/provider.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
 
 import 'model/photo_provider.dart';
 import 'page/index_page.dart';
@@ -15,7 +18,7 @@ final PhotoProvider provider = PhotoProvider();
 
 void main() {
   runZonedGuarded(
-    () => runApp(const _SimpleExampleApp()),
+    () => runApp(MyApp()),
     (Object e, StackTrace s) {
       if (kDebugMode) {
         FlutterError.reportError(FlutterErrorDetails(exception: e, stack: s));
@@ -173,6 +176,9 @@ class _SimpleExamplePageState extends State<_SimpleExamplePage> {
             key: ValueKey<int>(index),
             entity: entity,
             option: const ThumbnailOption(size: ThumbnailSize.square(200)),
+            onTap: () {
+              print('tap');
+            },
           );
         },
         childCount: _entities!.length,
@@ -219,6 +225,20 @@ class _SimpleExamplePageState extends State<_SimpleExamplePage> {
         onPressed: _requestAssets,
         child: const Icon(Icons.developer_board),
       ),
+    );
+  }
+}
+
+// void main() {
+//   runApp(MyApp());
+// }
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Photo Manager Demo',
+      home: MyHomePage(),
     );
   }
 }
