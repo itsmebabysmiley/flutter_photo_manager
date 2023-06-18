@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:oktoast/oktoast.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_example/widget/image_item_widget.dart';
+import 'package:video_player/video_player.dart';
 
 import 'pick_screen.dart';
 
@@ -18,6 +19,124 @@ class _MyHomePageState extends State<MyHomePage> {
   List<File> displayImage = [];
   Set<int> selectedImageIndices = {};
   bool _isLoading = false;
+  List<MediaFile> _pickedMedia = [];
+  VideoPlayerController? _controller;
+  VideoPlayerController? _toBeDisposed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(body: buildFromMe(context));
+  }
+
+  Widget buildFromMe(BuildContext context) {
+    print("length");
+    print(_pickedMedia.length);
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Photo Manager from me'),
+      ),
+      body: GridView.builder(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3, // Number of columns
+          crossAxisSpacing: 4.0,
+          mainAxisSpacing: 4.0,
+        ),
+        itemCount: _pickedMedia.length,
+        itemBuilder: (context, index) {
+          return Container(
+            margin: const EdgeInsets.all(10),
+            height: 100,
+            width: 100,
+            color: Colors.grey,
+            child: _pickedMedia[index].fileType == FileType.video
+                ? _controller != null && _controller!.value.isInitialized
+                    ? AspectRatio(
+                        aspectRatio: _controller!.value.aspectRatio,
+                        child: VideoPlayer(_controller!),
+                      )
+                    : Container()
+                : Image.file(
+                    File(_pickedMedia[index].file),
+                    fit: BoxFit.cover,
+                  ),
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          final pickedImages =
+              await Navigator.of(context).push<List<MediaFile>>(
+            MaterialPageRoute(builder: (context) => PickScreen()),
+          );
+
+          if (pickedImages == null) {
+            print('no data');
+          } else {
+            print('data from pick screen');
+            print(pickedImages.length);
+            setState(() {
+              _pickedMedia = pickedImages;
+            });
+            for (MediaFile media in pickedImages) {
+              if (media.fileType == FileType.video) {
+                await _playVideo(File(media.file));
+              }
+            }
+            print('_pickerMeida');
+            print(_pickedMedia.length);
+            // setState(() async {
+            //   _pickedMedia = pickedImages;
+
+            // });
+          }
+        },
+        child: Icon(Icons.photo_library),
+      ),
+    );
+  }
+
+  Widget buildFromSample(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Photo Manager from sample'),
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator.adaptive())
+          : GridView.custom(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+              ),
+              childrenDelegate: SliverChildBuilderDelegate(
+                (BuildContext context, int index) {
+                  final AssetEntity entity = _assets[index];
+                  return ImageItemWidget(
+                    key: ValueKey<int>(index),
+                    entity: entity,
+                    option:
+                        const ThumbnailOption(size: ThumbnailSize.square(200)),
+                    onTap: () {
+                      print('tap');
+                    },
+                  );
+                },
+                childCount: _assets.length,
+                findChildIndexCallback: (Key key) {
+                  // Re-use elements.
+                  if (key is ValueKey<int>) {
+                    return key.value;
+                  }
+                  return null;
+                },
+              ),
+            ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          _fetchNewMedia();
+        },
+        child: Icon(Icons.photo_library),
+      ),
+    );
+  }
 
   _fetchNewMedia() async {
     setState(() {
@@ -25,8 +144,6 @@ class _MyHomePageState extends State<MyHomePage> {
     });
     final PermissionState _ps = await PhotoManager.requestPermissionExtend();
     if (_ps.isAuth) {
-      // success
-//load the album list
       List<AssetPathEntity> albums =
           await PhotoManager.getAssetPathList(onlyAll: true);
       print(albums[0]);
@@ -83,108 +200,32 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(body: buildFromMe(context));
+  Future<void> _playVideo(File? file) async {
+    if (file != null && mounted) {
+      await _disposeVideoController();
+      late VideoPlayerController controller;
+      controller = VideoPlayerController.file(File(file.path));
+
+      _controller = controller;
+      // In web, most browsers won't honor a programmatic call to .play
+      // if the video has a sound track (and is not muted).
+      // Mute the video so it auto-plays in web!
+      // This is not needed if the call to .play is the result of user
+      // interaction (clicking on a "play" button, for example).
+      const double volume = 1.0;
+      await controller.setVolume(volume);
+      await controller.initialize();
+      await controller.setLooping(false);
+      // await controller.play();
+      setState(() {});
+    }
   }
 
-  Widget buildFromMe(BuildContext context) {
-    print('okay');
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Photo Manager from me'),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator.adaptive())
-          : GridView.builder(
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3, // Number of columns
-                crossAxisSpacing: 4.0,
-                mainAxisSpacing: 4.0,
-              ),
-              itemCount: displayImage.length,
-              itemBuilder: (context, index) {
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      if (selectedImageIndices.contains(index)) {
-                        selectedImageIndices.remove(index);
-                      } else {
-                        selectedImageIndices.add(index);
-                      }
-                    });
-                  },
-                  child: Container(
-                    margin: EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: selectedImageIndices.contains(index)
-                            ? Colors.blue // Border color for selected images
-                            : Colors.transparent, // No border for other images
-                        width: 3.0,
-                      ),
-                    ),
-                    child: ImageItemWidget(
-                      key: ValueKey<int>(index),
-                      entity: _assets[
-                          index], // Replace _assets[index] with your asset data
-                      option: ThumbnailOption(size: ThumbnailSize.square(200)),
-                    ),
-                  ),
-                );
-              },
-            ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // _fetchNewMedia();
-          Navigator.push(
-              context, MaterialPageRoute(builder: (context) => PickScreen()));
-        },
-        child: Icon(Icons.photo_library),
-      ),
-    );
-  }
-
-  Widget buildFromSample(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Photo Manager from sample'),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator.adaptive())
-          : GridView.custom(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-              ),
-              childrenDelegate: SliverChildBuilderDelegate(
-                (BuildContext context, int index) {
-                  final AssetEntity entity = _assets[index];
-                  return ImageItemWidget(
-                    key: ValueKey<int>(index),
-                    entity: entity,
-                    option:
-                        const ThumbnailOption(size: ThumbnailSize.square(200)),
-                    onTap: () {
-                      print('tap');
-                    },
-                  );
-                },
-                childCount: _assets.length,
-                findChildIndexCallback: (Key key) {
-                  // Re-use elements.
-                  if (key is ValueKey<int>) {
-                    return key.value;
-                  }
-                  return null;
-                },
-              ),
-            ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _fetchNewMedia();
-        },
-        child: Icon(Icons.photo_library),
-      ),
-    );
+  Future<void> _disposeVideoController() async {
+    if (_toBeDisposed != null) {
+      await _toBeDisposed!.dispose();
+    }
+    _toBeDisposed = _controller;
+    _controller = null;
   }
 }

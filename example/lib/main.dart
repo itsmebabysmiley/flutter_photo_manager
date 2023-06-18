@@ -7,8 +7,6 @@ import 'package:oktoast/oktoast.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_example/myscreen.dart';
 import 'package:provider/provider.dart';
-import 'package:path_provider/path_provider.dart';
-import 'dart:io';
 
 import 'model/photo_provider.dart';
 import 'page/index_page.dart';
